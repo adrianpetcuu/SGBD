@@ -1,0 +1,156 @@
+-- 1. Construiti un pachet care sa contina:
+
+-- o functie care returneaza numarul de comenzi încheiate de catre clientul al carui id este dat ca parametru. Tratati cazul în care nu exista clientul specificat;
+
+-- o procedura care foloseste functia de mai sus pentru a returna primii 3 clienti cu cele mai multe comenzi încheiate.
+
+-- Sa se apeleze procedura din cadrul pachetului.
+SET SERVEROUTPUT ON;
+
+CREATE OR REPLACE PACKAGE pachet_1 IS
+    FUNCTION get_nr_com (p_id NUMBER) RETURN NUMBER;
+    PROCEDURE afiseaza_top_clienti;
+END;
+/
+CREATE OR REPLACE PACKAGE BODY pachet_1 IS
+    FUNCTION get_nr_com (p_id NUMBER) RETURN NUMBER
+    IS
+        v NUMBER;
+        nu_exista_clientul EXCEPTION;
+    BEGIN 
+        SELECT COUNT(*) INTO v
+        FROM comenzi
+        WHERE id_client = p_id;
+        IF v = 0 THEN
+            RAISE nu_exista_clientul;
+        ELSE
+            RETURN v;
+        END IF;
+        
+    EXCEPTION
+        WHEN nu_exista_clientul THEN RETURN 0;
+    END;
+    
+    PROCEDURE afiseaza_top_clienti
+    IS 
+        CURSOR c IS SELECT DISTINCT id_client, nume_client, pachet_1.get_nr_com(id_client) nr_comenzi
+                    FROM comenzi JOIN clienti USING (id_client)
+                    ORDER BY nr_comenzi DESC
+                    FETCH FIRST 3 ROWS WITH TIES;
+    BEGIN
+        FOR x IN c LOOP
+            DBMS_OUTPUT.PUT_LINE(x.nume_client || ' ' || x.nr_comenzi);
+        END LOOP;
+    END;
+END;
+/
+
+BEGIN
+    pachet_1.afiseaza_top_clienti;
+END;
+
+
+
+
+-- 2. Realizati un pachet de subprograme care sa contina:
+
+-- o procedura  care sa adauge o înregistrare noua în tabela Functii. Informatiile ce trebuie adaugate sunt furnizate drept parametri procedurii. Se trateaza cazul în care exista deja o functie cu codul introdus.
+
+-- o  procedura care sa modifice denumirea unei functii. Codul functiei pentru care se face modificarea si noua denumire a functiei sunt parametrii procedurii. Se trateaza cazul în care modificarea nu are loc din cauza precizarii unui cod care nu se regaseste în tabela.
+
+-- o procedura care sa stearga o functie pe baza codului primit drept parametru. Se trateaza cazul în care codul furnizat nu exista.
+
+-- Sa se apeleze subprogramele din cadrul pachetului.
+
+
+CREATE OR REPLACE PACKAGE pachet_2 AS
+  PROCEDURE adaugare_functie(p_id functii.id_functie%TYPE, p_den functii.denumire_functie%TYPE, 
+                            p_salmin functii.salariu_min%TYPE, p_salmax functii.salariu_max%TYPE);
+  
+  PROCEDURE modificare_functie(p_id functii.id_functie%TYPE, p_den functii.denumire_functie%TYPE);
+  
+  PROCEDURE stergere_functie(p_id functii.id_functie%TYPE);
+END;
+/
+
+CREATE OR REPLACE PACKAGE BODY pachet_2 IS
+    FUNCTION cauta_functie(p_id functii.id_functie%TYPE)
+    RETURN BOOLEAN
+    IS 
+        x functii.id_functie%TYPE;
+    BEGIN
+        SELECT id_functie INTO x
+        FROM functii
+        WHERE id_functie = p_id;
+        RETURN TRUE;
+    EXCEPTION 
+        WHEN NO_DATA_FOUND THEN RETURN FALSE;
+    END;    
+  
+  
+    PROCEDURE adaugare_functie(p_id functii.id_functie%TYPE, p_den functii.denumire_functie%TYPE, 
+                            p_salmin functii.salariu_min%TYPE, p_salmax functii.salariu_max%TYPE) 
+    IS
+    BEGIN
+        IF cauta_functie(p_id) = FALSE THEN
+            INSERT INTO functii VALUES(p_id, p_den, p_salmin, p_salmax);
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Functia deja exista!');
+        END IF;
+    END;
+    
+    PROCEDURE modificare_functie(p_id functii.id_functie%TYPE, p_den functii.denumire_functie%TYPE)
+    IS 
+    BEGIN
+        IF cauta_functie(p_id) = TRUE THEN
+            UPDATE functii
+            SET denumire_functie = p_den
+            WHERE id_functie = p_id;
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Functia deja exista!');
+        END IF;
+    END;
+    
+    PROCEDURE stergere_functie(p_id functii.id_functie%TYPE)
+    IS 
+    BEGIN
+        IF cauta_functie(p_id) = TRUE THEN
+            DELETE FROM functii
+            WHERE id_functie = p_id;
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Functia nu exista!');
+        END IF;
+    END;
+
+END;
+/
+
+
+BEGIN
+  pachet_2.adaugare_functie(1, 'Functie1', 10, 1000);
+
+END;
+/
+
+
+
+
+-- 3. Construiti un pachet care sa contina:
+
+-- o procedura care returneaza numele, vechimea si venitul total (salariu + comision) pentru angajatul al carui id este dat ca parametru;
+
+-- o procedura care mareste cu 2 salariul angajatului al carui id este dat ca parametru.
+
+-- În ambele proceduri de mai sus, sa se verifice situatia în care angajatul indicat nu exista (invocând o exceptie în acest caz) prin apelul unei functii private, creata în acest scop.
+
+-- Sa se apeleze procedurile din cadrul pachetului.
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,62 @@
+SET SERVEROUTPUT ON
+ACCEPT x PROMPT 'Introduceti valoarea:'
+VARIABLE y NUMBER
+DECLARE 
+    v_nr NUMBER(5,2) := 123.456;
+    v_data DATE := SYSDATE; --CURRENT_DATE
+    v_tmsp TIMESTAMP := SYSTIMESTAMP; --CURRENT_TIMESTAMP
+    v_text VARCHAR2(20) := &x; --in APEX :a 
+BEGIN 
+    DBMS_OUTPUT.put_line(v_nr);
+    DBMS_OUTPUT.put_line(TO_CHAR(v_data, 'DD-MON-YYYY, HH:MI:SS'));
+    DBMS_OUTPUT.put_line(v_tmsp);
+    DBMS_OUTPUT.put_line(v_text);
+    :y := TRUNC(v_nr) + 100;
+    DBMS_OUTPUT.put_line(:y);
+END; 
+
+PRINT y
+
+SELECT * FROM angajati WHERE id_angajat = :y-100;
+
+DECLARE
+    v_nume angajati.nume%TYPE;
+    v_venit NUMBER;
+    v_vechimea NUMBER;
+    v_id angajati.id_angajat%TYPE := &id;
+BEGIN
+    SELECT nume, salariul + salariul * NVL(comision, 0), (SYSDATE-data_angajare)/365
+    INTO v_nume, v_venit, v_vechimea
+    FROM angajati
+    WHERE id_angajat = v_id;
+    DBMS_OUTPUT.PUT_LINE(v_nume || 'are venitul ' ||v_venit||' si vechimea ' || ROUND(v_vechimea, 2));
+END;
+
+
+
+
+
+
+
+
+DECLARE
+    v_nume angajati.nume%TYPE;
+    v_salariul angajati.salariul%TYPE;
+    v_id angajati.id_angajat%TYPE := &id; 
+BEGIN
+    SELECT nume, salariul
+    INTO v_nume, v_salariul
+    FROM angajati
+    WHERE id_angajat = v_id;
+    DBMS_OUTPUT.PUT_LINE(v_nume || 'are salariul ' ||v_salariul);
+    
+    v_salariul := v_salariul + 100;
+    
+    UPDATE angajati
+    SET salariul = v_salariul
+    WHERE id_angajat = v_id
+    RETURNING salariul INTO v_salariul;
+    
+    DBMS_OUTPUT.PUT_LINE(v_nume || 'are salariul final ' ||v_salariul);
+    
+END;

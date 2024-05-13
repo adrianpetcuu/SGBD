@@ -1,0 +1,173 @@
+--1. Creaţi un bloc PL/SQL pentru a selecta codul și data de încheiere a comenzilor încheiate într-un an introdus de la tastatură (prin comandă SELECT simplă, fără să utilizați un cursor explicit).
+
+--dacă interogarea returnează mai mult de o valoare pentru codul comenzii, tratați excepția cu o rutină de tratare corespunzătoare și afișați mesajul “Atenţie! In anul yyyy s-au încheiat mai multe comenzi!”;
+--dacă interogarea nu returnează nicio valoare pentru codul comenzii, tratați excepția cu o rutină de tratare corespunzătoare și afișați mesajul “Atenţie! In anul yyyy nu s-au încheiat comenzi!”;
+--dacă se returnează o singură linie, afișați codul și data comenzii;
+--tratați orice altă excepție cu o rutină de tratare corespunzătoare și afișați mesajul “A apărut o altă excepție!”.
+--testati cu anul 2015 (o singura comanda) => se face afisarea din zona executabila (comanda SELECT intoarce un singur rezultat)
+--testati cu anul 2019 (mai multe comenzi) => SELECT returneaza mai multe linii => TOO_MANY_ROWS
+--testati cu anul 2000 (nicio comanda) => SELECT nu returneaza nimic => NO_DATA_FOUND
+SET SERVEROUTPUT ON;
+DECLARE
+    v_an NUMBER := &a;
+    v_id comenzi.id_comanda%TYPE;
+    v_data comenzi.data%TYPE;
+    prea_multe EXCEPTION;
+    PRAGMA EXCEPTION_INIT(prea_multe, -01422);
+BEGIN
+    SELECT id_comanda, data
+    INTO v_id, v_data
+    FROM comenzi
+    WHERE EXTRACT(YEAR FROM data) = v_an;
+    
+    DBMS_OUTPUT.PUT_LINE(v_id || ' ' || v_data);
+EXCEPTION 
+    WHEN NO_DATA_FOUND THEN 
+        DBMS_OUTPUT.PUT_LINE('Nu exista comenzi in anul respectiv.');
+    WHEN prea_multe THEN 
+        DBMS_OUTPUT.PUT_LINE('Prea multe comenzi in anul respectiv.');
+        FOR v IN ( SELECT id_comanda, data
+                    INTO v_id, v_data
+                    FROM comenzi
+                    WHERE EXTRACT(YEAR FROM data) = v_an)
+        LOOP
+            DBMS_OUTPUT.PUT_LINE(v.id_comanda || ' ' || v.data);
+        END LOOP; 
+END;
+
+
+
+
+--2. Creaţi un bloc PL/SQL prin care se dublează preţul produsului (pret_lista) al cărui cod este citit de la tastatură. În cazul în care acesta nu există (comanda UPDATE nu realizează nicio modificare) se va invoca o excepție. Tratați excepția prin afișarea unui mesaj.
+
+
+--testati cu id produs 3061 pentru a obtine modificari prin UPDATE => se produce modificarea si se face afisarea din zona executabila
+--testati cu id produs 100 pentru a nu obtine modificari prin UPDATE => se invoca exceptia definita de utilizator => se afiseaza mesajul din Exception
+
+
+DECLARE
+    v_id produse.id_produs%TYPE := &a;
+    produs_inexistent EXCEPTION;
+    
+BEGIN
+    UPDATE produse
+    SET pret_lista = pret_lista * 2
+    WHERE id_produs = v_id;
+    
+    IF SQL%FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('OK');
+    ELSE
+        RAISE produs_inexistent;
+    END IF;
+    
+EXCEPTION
+    WHEN produs_inexistent THEN
+        DBMS_OUTPUT.PUT_LINE('Nu exista produsul');
+    
+END;
+
+
+
+--3. Într-un bloc PL/SQL citiți de la tastatură identificatorul unui produs. Afișați denumirea produsului care are acel cod. De asemenea, calculați cantitatea totală comandată din acel produs.
+
+--afișați denumirea produsului;
+--dacă produsul nu există, tratați excepția cu o rutină de tratare corespunzătoare;
+--dacă produsul nu a fost comandat, invocați o excepție, care se va trata corespunzător;
+--dacă produsul există și a fost comandat, afișați cantitatea totală comandată;
+--tratați orice altă excepție cu o rutină de tratare corespunzătoare.
+--testati cu id produs 3061 (nu a fost comandat) => se invoca exceptia definita de utilizator => se afiseaza mesajul din Exception
+--testati cu id produs 2311 (a fost comandat) => se afiseaza mesajul din zona executabila
+--testati cu id produs 100 (nu exista) => NO_DATA_FOUND
+
+
+DECLARE
+    v_den produse.denumire_produs%TYPE;
+    v_id produse.id_produs%TYPE := &a;
+    v_total NUMBER;
+    produs_necomandat EXCEPTION;
+BEGIN
+    SELECT denumire_produs 
+    INTO v_den
+    FROM produse
+    WHERE id_produs = v_id;
+    DBMS_OUTPUT.PUT_LINE(v_den);
+    
+    SELECT SUM(cantitate) INTO v_total
+    FROM rand_comenzi
+    WHERE id_produs = v_id;
+    
+    IF v_total IS NULL THEN
+        RAISE produs_necomandat;
+    ELSE
+    DBMS_OUTPUT.PUT_LINE('Cantitate totala ' || v_total);
+    END IF;
+    
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Nu exista produsul');
+    WHEN produs_necomandat THEN
+        DBMS_OUTPUT.PUT_LINE('Produsul exista dar nu a fost comandat');
+        
+END;
+
+
+--4. Într-un bloc PL/SQL utilizați un cursor parametrizat pentru a prelua numele, salariul și vechimea angajaților dintr-un departament furnizat drept parametru.
+
+--deschideți cursorul prin indicarea ca parametru a unei variabile de substituție, a cărei valoare să fie citită de la tastatură;
+--parcurgeți cursorul și afișați informațiile solicitate pentru acei angajați care fac parte din departamentul indicat;
+--afișați numărul total de angajați parcurși;  
+--în cazul în care nu există departamentul indicat, se va invoca o excepție, care se va trata corespunzător;
+--în cazul în care nu există angajați în departamentul indicat, se va invoca o excepție, care se va trata corespunzător.
+--testati cu id departament 7 pentru a verifica lipsa departamentului  => se invocă excepție
+--testati cu id departament 210 pentru a nu obtine niciun rezultat  => SELECT nu returneaza nimic, deci cursorul indica o zona goala de memorie => nu se face nicio parcurgere
+--testati cu id departament 50 pentru a obtine mai multe rezultate => se efectueaza parcurgerile asupra setului de date adus in memorie
+
+DECLARE
+    CURSOR c (p NUMBER) IS SELECT nume, salariul, (SYSDATE -data_angajare) / 365 AS vechime
+                    FROM angajati
+                    WHERE id_departament = p;
+    v_id NUMBER := &a;
+    i NUMBER := 0;
+    x NUMBER;
+    departament_inexistent EXCEPTION;
+    fara_angajati EXCEPTION;
+BEGIN
+    SELECT COUNT(id_departament) INTO x
+    FROM departamente
+    WHERE id_departament = v_id;
+    
+    IF x = 0 THEN 
+        RAISE departament_inexistent;
+    ELSE
+        FOR v IN c (v_id) LOOP
+            DBMS_OUTPUT.PUT_LINE(v.nume|| ' ' || v.salariul || ' ' || v.vechime);
+            i := i + 1;
+        END LOOP;
+        IF i = 0 THEN 
+            RAISE fara_angajati;
+        ELSE
+            DBMS_OUTPUT.PUT_LINE(i || ' angajati');
+        END IF;
+    END IF;
+    
+EXCEPTION 
+    WHEN departament_inexistent THEN
+    DBMS_OUTPUT.PUT_LINE('Nu exista departamentul');
+    WHEN fara_angajati THEN
+    DBMS_OUTPUT.PUT_LINE('Nu sunt angajati');
+    
+END;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

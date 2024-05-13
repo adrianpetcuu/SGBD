@@ -1,0 +1,174 @@
+--1. Printr-un bloc PL/SQL, să se atribuie comision angajaților din departamentul al cărui id este citit de la tastatură. 
+--Să se afișeze numărul de modificări totale efectuate.
+SET SERVEROUTPUT ON
+DECLARE
+    v_id angajati.id_departament%TYPE := &a;
+    v_test NUMBER;
+BEGIN
+    UPDATE angajati
+    SET comision = 0.1
+    WHERE id_departament = v_id;
+    
+    IF SQL%NOTFOUND = TRUE THEN  
+        SELECT COUNT(*) INTO v_test
+        FROM departamente
+        WHERE id_departament = v_id; 
+        
+        IF v_test = 1 THEN
+        DBMS_OUTPUT.PUT_LINE('Dep exista, dar nu are angajati');
+        ELSE
+        DBMS_OUTPUT.PUT_LINE('Nu exista dep');
+        END IF;
+    ELSE
+        DBMS_OUTPUT.PUT_LINE(SQL%ROWCOUNT||' modificari');
+    END IF;
+END;
+
+--2. Construiți un bloc PL/SQL prin care să se afișeze informații despre angajații din orașul Toronto.
+
+SELECT id_angajat, nume, oras
+FROM angajati JOIN departamente USING(id_departament)
+JOIN locatii USING(id_locatie)
+WHERE UPPER(oras) = 'TORONTO';
+
+DECLARE
+    CURSOR c IS SELECT id_angajat, nume, oras
+                FROM angajati JOIN departamente USING(id_departament)
+                JOIN locatii USING(id_locatie)
+                WHERE UPPER(oras) = 'TORONTO';
+    v c%ROWTYPE;
+    
+BEGIN
+--deschidere cursor
+OPEN c;
+    LOOP
+        --parcurgere cursor
+        FETCH c INTO v;
+        EXIT WHEN c%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(v.nume);
+    END LOOP;
+--inchidere cursor
+CLOSE c;
+END;
+/
+--3. Construiți un bloc PL/SQL prin care să se afișeze primele 3 comenzi care au cele mai multe produse comandate.
+SELECT id_comanda, data, COUNT(id_produs)
+FROM comenzi JOIN rand_comenzi USING(id_comanda)
+GROUP BY id_comanda, data
+ORDER BY 3 DESC
+FETCH FIRST 3 ROWS ONLY;
+/
+DECLARE
+    CURSOR c IS SELECT id_comanda, data, COUNT(id_produs) AS NR_PROD
+                FROM comenzi JOIN rand_comenzi USING(id_comanda)
+                GROUP BY id_comanda, data
+                ORDER BY 3 DESC
+                FETCH FIRST 3 ROWS ONLY;
+BEGIN
+
+    FOR v IN c LOOP
+        DBMS_OUTPUT.PUT_LINE(v.id_comanda||' '||V.NR_PROD);
+    END LOOP;
+
+END;
+/
+
+--sau
+    
+BEGIN
+    FOR v IN(SELECT id_comanda, data, COUNT(id_produs) AS NR_PROD
+            FROM comenzi JOIN rand_comenzi USING(id_comanda)
+            GROUP BY id_comanda, data
+            ORDER BY 3 DESC
+            FETCH FIRST 3 ROWS ONLY)
+
+    LOOP
+        DBMS_OUTPUT.PUT_LINE(v.id_comanda||' '||V.NR_PROD);
+    END LOOP;
+
+END;
+/
+
+
+
+--4. Construiți un bloc PL/SQL prin care să se afișeze, pentru fiecare departament, valoarea totală a salariilor plătite angajaților.
+
+SELECT id_departament, denumire_departament,  SUM(salariul) as sal_total
+FROM angajati JOIN departamente USING(id_departament)
+GROUP BY id_departament, denumire_departament;
+
+DECLARE
+    CURSOR c IS SELECT id_departament, denumire_departament,  SUM(salariul) as sal_total
+                FROM angajati JOIN departamente USING(id_departament)
+                GROUP BY id_departament, denumire_departament;
+    v c%ROWTYPE;
+BEGIN
+
+    FOR v IN c LOOP
+        DBMS_OUTPUT.PUT_LINE(v.id_departament||' '||V.sal_total);
+    END LOOP;
+
+END;
+--5. Construiți un bloc PL/SQL prin care să se afișeze informații despre angajați, precum și numărul de comenzi intermediate de fiecare.
+SELECT id_angajat, nume, COUNT(id_comanda) nr_total
+FROM angajati JOIN comenzi USING(id_angajat)
+GROUP BY id_angajat, nume;
+
+DECLARE
+    CURSOR c IS SELECT id_angajat, nume, COUNT(id_comanda) nr_total
+                FROM angajati JOIN comenzi USING(id_angajat)
+                GROUP BY id_angajat, nume;
+    v c%ROWTYPE;
+BEGIN
+
+    FOR v IN c LOOP
+        DBMS_OUTPUT.PUT_LINE(v.id_angajat||' '|| v.nume ||' '||V.nr_total);
+    END LOOP;
+
+END;
+--6. Construiți un bloc PL/SQL prin care să se afișeze pentru fiecare departament (id și nume) informații despre angajații aferenți (id, nume, salariu). Să se afișeze la nivelul fiecărui departament și salariul total plătit.
+--Informațiile vor fi afișate în următoarea manieră:
+
+--*departament A
+--******angajat 1
+--******angajat 2
+--Total salarii A: ...
+
+--* departament B
+--******angajat 5
+--******angajat 6
+--******angajat 7
+--Total salarii B: ...
+/
+DECLARE 
+    CURSOR d IS SELECT id_departament, denumire_departament FROM departamente;
+    CURSOR a IS SELECT id_angajat, nume, salariul, id_departament FROM angajati;
+BEGIN
+    FOR v IN d LOOP
+        DBMS_OUTPUT.PUT_LINE(v.denumire_departament);
+        FOR w IN A LOOP
+            IF v.id_departament = w.id_departament THEN
+                DBMS_OUTPUT.PUT_LINE('***'||w.nume);
+            END IF; 
+        END LOOP;
+    END LOOP;
+END;
+/
+
+DECLARE 
+    CURSOR d IS SELECT id_departament, denumire_departament 
+                FROM departamente
+                WHERE id_departament IN (SELECT id_departament FROM angajati);
+    CURSOR a (p NUMBER) IS SELECT id_angajat, nume, salariul, id_departament 
+                FROM angajati 
+                WHERE id_departament = p;
+BEGIN
+    FOR v IN d LOOP
+        DBMS_OUTPUT.PUT_LINE(v.denumire_departament);
+        FOR w IN a (v.id_departament) LOOP
+                DBMS_OUTPUT.PUT_LINE('***'||w.nume);
+        END LOOP;
+    END LOOP;
+END;
+
+

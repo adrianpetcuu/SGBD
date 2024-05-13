@@ -1,0 +1,143 @@
+--====== EX. 1
+
+--Sa se creeze un trigger, trg_pk_produs, asupra tabelei Produse, care sa adauge in campul cheie primara valoarea maxima existenta incrementata
+
+--Sa se verifice declansatorul!
+
+
+CREATE OR REPLACE TRIGGER trg_pk_produs
+BEFORE INSERT ON produse
+FOR EACH ROW
+BEGIN 
+    SELECT MAX(id_produs)+1 INTO :NEW.id_produs
+    FROM produse;
+END;
+/
+--comanda declansatoare
+INSERT INTO produse VALUES
+(1, 'Pepsi', 'suc', 'bauturi', NULL, NULL);
+
+
+
+
+
+
+
+--====== EX. 2
+
+--Sa se creeze un trigger, trg_update_prod_cascada, asupra tabelei Produse, prin care, la modificarea valorii id_produs din tabela parinte, aceasta sa se modifice automat si in inregistrarile corespondente din tabela copil
+
+-- (update in cascada parinte-copil)
+
+--Sa se verifice declansatorul!
+
+CREATE OR REPLACE TRIGGER trg_update_prod_cascada
+AFTER UPDATE OF id_produs ON produse
+FOR EACH ROW
+BEGIN
+    UPDATE rand_comenzi
+    SET id_produs = :NEW.id_produs
+    WHERE id_produs = :OLD.id_produs;
+END;
+/
+
+--comanda declansatoare
+UPDATE produse
+SET id_produs = 10   -- :NEW.id_produs
+WHERE id_produs = 3114; -- :OLD.id_produs
+
+
+
+
+
+
+
+
+
+
+
+
+--====== EX. 3
+
+--Sa se creeze un declanşator, trg_stop_marire, care să împiedice mărirea salariului pentru angajații cu vechimea mai mare de 10 de ani. Testați declanșarea trigger-ului.
+
+CREATE OR REPLACE TRIGGER trg_stop_marire
+BEFORE UPDATE OF salariul ON angajati
+FOR EACH ROW
+BEGIN
+    IF (:NEW.salariul > :OLD.salariul) 
+        AND (SYSDATE-:OLD.data_angajare) > 3650 THEN
+        RAISE_APPLICATION_ERROR(-20000, 'Nu se poate mari salariul!');
+    END IF;
+END;
+
+
+--comanda declansatoare
+UPDATE angajati
+SET salariul = salariul - 1
+WHERE id_angajat = 100;
+
+
+
+
+--====== EX. 4
+
+---Să se adauge în tabela Produse coloana Stoc. Să se introducă valoarea 2000 în coloana nou adăugată.
+
+---Să se creeze un trigger, trg_verifica_stoc, care să nu permită comandarea unui produs în cantitate mai mare decât stocul aferent.
+
+---Totodată, pentru produsele comandate, prin trigger se va diminua stocul cu valoarea comandată.
+
+--Să se verifice declanșatorul.
+
+
+
+ALTER TABLE produse
+ADD stoc NUMBER DEFAULT 2000;
+
+CREATE OR REPLACE TRIGGER trg_verifica_stoc
+BEFORE INSERT OR UPDATE OF cantitate ON rand_comenzi
+FOR EACH ROW 
+DECLARE
+    v_stoc NUMBER;
+
+BEGIN
+    SELECT stoc INTO v_stoc
+    FROM produse
+    WHERE id_produs = :NEW.id_produs;
+    
+    IF v_stoc < :NEW.cantitate THEN 
+        RAISE_APPLICATION_ERROR(-20000, 'Stoc insuficient');
+    ELSE
+        IF INSERTING THEN
+            UPDATE produse
+            SET stoc = stoc - :NEW.cantitate
+            WHERE id_produs = :NEW.id_produs;
+        ELSIF UPDATING THEN
+            UPDATE produse
+            SET stoc = stoc + :OLD.cantitate - :NEW.cantitate
+            WHERE id_produs = :NEW.id_produs;
+        END IF;
+    END IF;
+END;
+/
+
+UPDATE rand_comenzi
+SET cantitate = 53
+WHERE id_produs = 100 AND id_comanda = 2354;
+
+
+
+
+
+
+
+--====== EX. 5
+
+--Sa se creeze un declansator, trg_actualizeaza_istoric, prin care, in momentul modificarii functiei unui angajat, se va adauga automat o noua inregistrare in tabela istoric_functii, astfel:
+
+  ---daca angajatul nu si-a mai schimbat functia niciodata: data de inceput in functia schimbata va fi data angajarii, iar cea de sfarsit data curenta
+
+  ---daca angajatul si-a mai schimbat functia: data de inceput pentru functia schimbata va fi ultima data de sfarsit pe o functie detinuta de angajatul in cauza
+
+--Sa se verifice declansatorul.

@@ -1,0 +1,91 @@
+--1. Construiti functia Nume_complet care sa returneze numele complet al angajatului dat ca parametru. Tratati cazul în care angajatul indicat nu exista. Apelati functia.
+SET SERVEROUTPUT ON;
+CREATE OR REPLACE FUNCTION nume_complet(p_id IN NUMBER)
+RETURN VARCHAR2
+IS
+    v_nume VARCHAR2(50);
+BEGIN
+    SELECT nume || ' ' || prenume
+    INTO v_nume
+    FROM angajati
+    WHERE id_angajat = p_id;
+    
+    RETURN v_nume;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
+END;
+/
+
+DECLARE
+    v_nume VARCHAR2(50);
+BEGIN
+    v_nume := nume_complet(100); 
+    IF v_nume IS NULL THEN
+        DBMS_OUTPUT.PUT_LINE('Nu exista angajatul');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE(v_nume);
+    END IF;
+END;
+/
+
+
+--2. Construiti procedura Dubleaza_salariu care sa dubleze salariul angajatilor din departamentul indicat drept parametru. Tratati cazurile în care departamentul indicat nu exista, dar si pe cel in care acesta exista, dar nu are angajati. Apelati procedura.
+
+CREATE OR REPLACE PROCEDURE dubleaza_salariu(p_id IN NUMBER)
+IS
+    a NUMBER;
+    nu_exista_dep EXCEPTION;
+    nu_are_ang EXCEPTION;
+BEGIN
+    SELECT COUNT(*) INTO a
+    FROM departamente
+    WHERE id_departament = p_id;
+
+    IF a = 0 THEN RAISE nu_exista_dep;
+    ELSE
+        UPDATE angajati
+        SET salariul = salariul * 2
+        WHERE id_departament = p_id; 
+        
+        IF SQL%NOTFOUND THEN RAISE nu_are_ang;
+        ELSE DBMS_OUTPUT.PUT_LINE(SQL%ROWCOUNT || ' modificari');
+        END IF;
+    END IF;
+EXCEPTION 
+    WHEN nu_exista_dep THEN DBMS_OUTPUT.PUT_LINE('Nu exista departamentul');
+    WHEN nu_are_ang THEN DBMS_OUTPUT.PUT_LINE('Exista departamentul, dar nu are angajati');
+END;
+/
+
+BEGIN
+    dubleaza_salariu(100);
+END;
+/
+
+
+--3. Construiti procedura Valoare_comenzi care sa calculeze si sa afiseze valoarea fiecarei comenzi (identificate prin id și data) încheiate într-un an indicat ca parametru de intrare. Apelati procedura.
+
+CREATE OR REPLACE PROCEDURE valoare_comenzi(p_an IN NUMBER)
+IS
+    a number;
+BEGIN
+    FOR v IN(SELECT id_comanda, data, SUM(pret * cantitate) as valoare
+        FROM comenzi JOIN rand_comenzi USING(id_comanda)
+        WHERE EXTRACT(YEAR FROM data)= p_an
+        GROUP BY id_comanda, data)  
+    LOOP
+        DBMS_OUTPUT.PUT_LINE(v.id_comanda ||' ' || v.data|| ' ' || v.valoare);
+    END LOOP;
+END;
+/
+BEGIN
+    valoare_comenzi(2016);
+END;
+/
+
+
+--4. Construiti functia Calcul_vechime care sa returneze vechimea angajatului al carui id este dat ca parametru de intrare. Tratati cazul în care angajatul indicat nu exista.
+
+--5. Apelati functia de mai sus în cadrul unei proceduri, Vechime_angajati, prin care se vor parcurge toti angajatii, în scopul afisarii vechimii fiecaruia.

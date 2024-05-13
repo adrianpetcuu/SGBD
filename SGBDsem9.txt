@@ -1,0 +1,43 @@
+SET SERVEROUTPUT ON;
+
+CREATE OR REPLACE PROCEDURE functie_noua(id_functie functii.id_functie%TYPE, denumire_functie functii.denumire_functie%TYPE, 
+                            sal_min functii.salariu_min%TYPE)
+IS
+    sal_max NUMBER := sal_min * 2;
+BEGIN
+    INSERT INTO functii VALUES(id_functie, denumire_functie, sal_min, sal_max);
+END;
+
+BEGIN 
+    functie_noua('HR_ADI','Director', 15000);
+END;
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE adauga_istoric_functie(id_fct IN VARCHAR2, id_ang IN NUMBER)
+IS
+
+BEGIN
+    INSERT INTO istoric_functii
+    SELECT id_angajat, data_angajare, SYSDATE, id_functie, id_departament FROM angajati
+    WHERE id_angajat = id_ang;
+    
+    UPDATE angajati
+    SET data_angajare = SYSDATE,
+    id_functie = id_fct,
+    salariul = (SELECT salariu_min + 500 FROM functii WHERE id_functie = id_fct)
+    WHERE id_angajat = id_ang;
+    DBMS_OUTPUT.PUT_LINE('Istoricul functiei pentru angajatul cu id-ul: ' || id_ang || ' a fost modificat');
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Nu exista angajatul cu id-ul dat');  
+END;
+
+BEGIN
+    adauga_istoric_functie('HR_ADI', 100);
+END;
+/
+
+

@@ -1,0 +1,121 @@
+--1. Intr-un bloc PL/SQL, folosind un cursor explicit, afisati informatii despre primii 5 salariati angajati (se va realiza filtrarea in functie de campul Data_Angajare).
+
+SET SERVEROUTPUT ON
+DECLARE
+    CURSOR c IS
+        SELECT id_angajat, nume, prenume, data_angajare, salariul FROM angajati
+        ORDER BY data_angajare
+        FETCH FIRST 5 ROWS ONLY;
+    v_id_angajat angajati.id_angajat%TYPE;
+    v_nume angajati.nume%TYPE;
+    v_prenume angajati.prenume%TYPE;
+    v_data_angajare angajati.data_angajare%TYPE;
+    v_salariul angajati.salariul%TYPE;
+BEGIN
+    OPEN c;
+    LOOP
+        FETCH c INTO v_id_angajat, v_nume, v_prenume, v_data_angajare, v_salariul;
+        EXIT WHEN c%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('Id angajat: ' || v_id_angajat || ', Nume: ' || v_nume || ', Prenume: ' || v_prenume || ', Data Angajare: ' || v_data_angajare || ', Salariu: ' || v_salariul);
+    END LOOP;
+    CLOSE c;
+END;
+/
+
+
+--2. Intr-un bloc PL/SQL, folosind un cursor explicit, selectati numele, functia, data angajarii si vechimea salariatilor din tabela Angajati. 
+
+--Parcurgeti fiecare rand al cursorului si, in cazul in care data angajarii depaseste 01-AUG-2016, afisati informatiile preluate.
+
+
+
+--3. Intr-un bloc PL/SQL, utilizand un cursor de tipul FOR-UPDATE, afisati numarul de comenzi intermediate de fiecare angajat si, in functie de acesta, modificati procentul comisionului primit, astfel:
+
+	--daca numarul de comenzi date este mai mic de 6, atunci comisionul devine 0.6
+
+	--daca numarul comenzilor este intre 6 si 10, atunci comisionul devine 0.7
+
+	--altfel, comisionul devine 0.8
+    
+DECLARE
+    CURSOR c IS (SELECT id_angajat, nume, comision, COUNT(id_comanda) AS nr_comenzi
+                FROM angajati JOIN comenzi USING(id_angajat)
+                GROUP BY id_angajat, nume, comision);
+BEGIN 
+    FOR i in c LOOP
+        IF i.nr_comenzi < 6 THEN
+            UPDATE angajati
+            SET comision = 0.6
+            WHERE id_angajat = i.id_angajat;
+        ELSIF  i.nr_comenzi BETWEEN 6 AND 10 THEN 
+            UPDATE angajati 
+            SET comision = 0.7
+            WHERE id_angajat = i.id_angajat;
+        ELSE
+            UPDATE angajati
+            SET comision = 0.8
+            WHERE id_angajat = i.id_angajat;
+        END IF;
+    END LOOP;
+    
+    FOR i IN c LOOP
+        DBMS_OUTPUT.PUT_LINE(i.nume || ' ' || i.nr_comenzi || ' ' || i.comision);
+    END LOOP;
+    
+END;
+
+
+--4. Sa se construiasca un bloc PL/SQL prin care sa se dubleze salariul angajatilor care au incheiat comenzi in anul 2009 si sa se pastreze numele lor intr-o tabela indexata. Sa se afiseze valorile elementelor colectiei.
+
+DECLARE
+    TYPE tip IS TABLE OF angajati.nume%TYPE INDEX BY PLS_INTEGER;
+    t tip;
+BEGIN
+   
+    UPDATE angajati
+    SET salariul = salariul * 2
+    WHERE id_angajat IN (SELECT id_angajat FROM comenzi WHERE EXTRACT(YEAR FROM data) = 2009)
+    RETURNING nume BULK COLLECT INTO t;
+
+    FOR i IN t.FIRST..t.LAST
+    LOOP
+        DBMS_OUTPUT.PUT_LINE('Nume angajat: ' || t(i));
+    END LOOP;
+END;
+/
+
+
+
+--5. Sa se construiasca un bloc PL/SQL prin care sa se calculeze si sa se memoreze intr-o tabela indexata salariul mediu al fiecarui departament. Afisati valorile elementelor colectiei.
+
+
+DECLARE
+    TYPE rec IS RECORD
+    (
+        den departamente.denumire_departament%TYPE,
+        med NUMBER
+    );
+    TYPE tip IS TABLE OF rec INDEX BY PLS_INTEGER;
+    t tip;
+BEGIN 
+    SELECT denumire_departament, ROUND(AVG(salariul), 2) AS salariul_mediu
+    BULK COLLECT INTO t
+    FROM angajati JOIN departamente 
+    USING(id_departament)
+    GROUP BY denumire_departament;
+    
+     FOR i IN t.FIRST..t.LAST
+    LOOP
+        DBMS_OUTPUT.PUT_LINE(t(i).den || ' are sal mediu  ' || t(i).med);
+    END LOOP;
+END;
+
+
+
+
+
+
+
+--6. Sa se construiasca un bloc PL/SQL prin care sa se calculeze si sa se memoreze intr-o tabela indexata: pentru fiecare client (nume_client) valoarea totala a comenzilor efectuate.
+
+--Sa se afiseze si numarul de elemente ale colectiei, dar si valorile elementelor acesteia.
