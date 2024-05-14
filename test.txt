@@ -1,0 +1,91 @@
+CREATE OR REPLACE PACKAGE cerinta_1 
+AS
+    FUNCTION vechime(id IN angajati.id_angajat%TYPE) RETURN NUMBER;
+    PROCEDURE modificaCredit;
+END cerinta_1;
+/
+
+CREATE OR REPLACE PACKAGE BODY cerinta_1
+AS
+    FUNCTION vechime(id IN angajati.id_angajat%TYPE) RETURN NUMBER
+    IS
+        v_counter NUMBER;
+        v_vechime NUMBER;
+        
+    BEGIN
+        SELECT COUNT(*) INTO v_counter
+        FROM angajati
+        WHERE id_angajat = id;
+        
+        IF v_counter = 0 THEN
+            DBMS_OUTPUT.PUT_LINE('Angajatul din functia vechime nu exista');
+            RETURN 0;
+        END IF;
+        
+        SELECT ROUND((SYSDATE - data_angajare)/365, 2) 
+        INTO v_vechime
+        FROM angajati
+        WHERE id_angajat = id;
+        
+        RETURN v_vechime;
+    END vechime;
+    
+    PROCEDURE modificaCredit
+    IS
+        CURSOR c_clienti IS SELECT id_client FROM clienti;
+        v_counter NUMBER;
+        v_medie NUMBER;
+        v_modificari NUMBER;
+        
+        e_cond_invalid EXCEPTION;
+    BEGIN
+        v_modificari := 0;
+        FOR v_client IN c_clienti LOOP
+            SELECT AVG(cl.limita_credit)
+            INTO v_medie
+            FROM clienti cl, comenzi com
+            WHERE cl.id_client = com.id_client
+            AND EXTRACT(YEAR FROM data) = 2017;
+        
+            SELECT COUNT(com.id_comanda) as comenziOnlineOffice2  
+            INTO v_counter
+            FROM comenzi com, produse prod, rand_comenzi rc
+            WHERE rc.id_produs = prod.id_produs
+            AND com.id_comanda = rc.id_comanda
+            AND com.modalitate = 'online'
+            AND prod.categorie = 'hardware8'
+            AND com.id_client = v_client.id_client;
+            
+            IF v_counter > 0 THEN
+                -- Updatam limita de credit 
+                UPDATE clienti 
+                SET limita_credit = v_medie
+                WHERE id_client = v_client.id_client;
+                
+                v_modificari := v_modificari + 1;
+            END IF;
+        END LOOP;
+        
+        IF v_modificari > 0 THEN
+         DBMS_OUTPUT.PUT_LINE('S-au efectuat ' || v_modificari || ' modificari');
+        ELSE 
+            RAISE e_cond_invalid;
+        END IF;
+    EXCEPTION
+        WHEN e_cond_invalid THEN
+            DBMS_OUTPUT.PUT_LINE('Nu sunt clienti valizi');
+    END modificaCredit;
+END cerinta_1;
+/
+
+DECLARE
+    v_vechime NUMBER;
+    CURSOR c_ang IS SELECT * FROM angajati;
+BEGIN
+    FOR v_ang IN c_ang LOOP
+        v_vechime := cerinta_1.vechime(v_ang.id_angajat);
+        DBMS_OUTPUT.PUT_LINE(v_vechime);
+    END LOOP;
+    
+    cerinta_1.modificaCredit;
+END;
